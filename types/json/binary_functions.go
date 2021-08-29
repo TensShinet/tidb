@@ -50,6 +50,14 @@ func (bj BinaryJSON) Type() string {
 		return "DOUBLE"
 	case TypeCodeString:
 		return "STRING"
+	case TypeCodeCustomData:
+		switch bj.Value[0] {
+		case CustomTypeCodeDecimal:
+			return "DECIMAL"
+		default:
+			msg := fmt.Sprintf(unknownTypeCodeErrorMsg, bj.TypeCode)
+			panic(msg)
+		}
 	default:
 		msg := fmt.Sprintf(unknownTypeCodeErrorMsg, bj.TypeCode)
 		panic(msg)

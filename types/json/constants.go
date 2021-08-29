@@ -40,6 +40,14 @@ const (
 	TypeCodeFloat64 TypeCode = 0x0b
 	// TypeCodeString indicates the JSON is a string.
 	TypeCodeString TypeCode = 0x0c
+	// TypeCodeCustomData indicates the JSON is a MySQL data type.
+	TypeCodeCustomData TypeCode = 0x0f
+)
+
+type CustomTypeCode = byte
+
+const (
+	CustomTypeCodeDecimal CustomTypeCode = 0x01
 )
 
 const (
@@ -53,6 +61,7 @@ const (
 
 const unknownTypeCodeErrorMsg = "unknown type code: %d"
 const unknownTypeErrorMsg = "unknown type: %s"
+const unknownCustomTypeErrorMsg = "unknown custom type code: %d"
 
 // safeSet holds the value true if the ASCII character with the given array
 // position can be represented inside a JSON string without any further

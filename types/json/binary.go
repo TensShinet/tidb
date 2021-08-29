@@ -47,6 +47,7 @@ import (
        0x0a |       // uint64
        0x0b |       // double
        0x0c |       // utf8mb4 string
+       0x0f         // custom data (any MySQL data type)
 
    value ::=
        object  |
@@ -54,6 +55,7 @@ import (
        literal |
        number  |
        string  |
+       custom-data
 
    object ::= element-count size key-entry* value-entry* key* value*
 
@@ -91,6 +93,11 @@ import (
 
    string ::= data-length utf8mb4-data
 
+   custom-data ::= custom-type data-length binary-data
+
+   custom-type ::= uint8   // type identifier that matches the
+                           // internal enum_field_types enum
+
    data-length ::= uint8*    // If the high bit of a byte is 1, the length
                              // field is continued in the next byte,
                              // otherwise it is the last byte of the length
@@ -98,6 +105,12 @@ import (
                              // lengths up to 127, 2 bytes to represent
                              // lengths up to 16383, and so on...
 */
+
+// CustomData represents any MySQL data type data.
+type CustomData struct {
+	TypeCode CustomTypeCode
+	Value    []byte
+}
 
 // BinaryJSON represents a binary encoded JSON object.
 // It can be randomly accessed without deserialization.
@@ -140,6 +153,8 @@ func (bj BinaryJSON) marshalTo(buf []byte) ([]byte, error) {
 		return bj.marshalFloat64To(buf)
 	case TypeCodeArray:
 		return bj.marshalArrayTo(buf)
+	case TypeCodeCustomData:
+		// TODO: marshal custom data
 	case TypeCodeObject:
 		return bj.marshalObjTo(buf)
 	}
@@ -514,11 +529,30 @@ func appendBinary(buf []byte, in interface{}) (TypeCode, []byte, error) {
 		if err != nil {
 			return typeCode, nil, errors.Trace(err)
 		}
+	case CustomData:
+		typeCode = TypeCodeCustomData
+		buf, err = appendCustomData(buf, x)
+		if err != nil {
+			return typeCode, nil, errors.Trace(err)
+		}
 	default:
 		msg := fmt.Sprintf(unknownTypeErrorMsg, reflect.TypeOf(in))
 		err = errors.New(msg)
 	}
 	return typeCode, buf, err
+}
+
+func appendCustomData(buf []byte, data CustomData) ([]byte, error) {
+	switch data.TypeCode {
+	case CustomTypeCodeDecimal:
+		buf = append(buf, CustomTypeCodeDecimal)
+		buf = appendLength(buf, len(data.Value))
+		buf = append(buf, data.Value...)
+		return buf, nil
+	default:
+		msg := fmt.Sprintf(unknownCustomTypeErrorMsg, data.TypeCode)
+		return nil, errors.New(msg)
+	}
 }
 
 func appendZero(buf []byte, length int) []byte {
@@ -566,11 +600,16 @@ func appendBinaryNumber(buf []byte, x json.Number) (TypeCode, []byte, error) {
 	return typeCode, nil, errors.Trace(err)
 }
 
-func appendBinaryString(buf []byte, v string) []byte {
+func appendLength(buf []byte, length int) []byte {
 	begin := len(buf)
 	buf = appendZero(buf, binary.MaxVarintLen64)
-	lenLen := binary.PutUvarint(buf[begin:], uint64(len(v)))
+	lenLen := binary.PutUvarint(buf[begin:], uint64(length))
 	buf = buf[:len(buf)-binary.MaxVarintLen64+lenLen]
+	return buf
+}
+
+func appendBinaryString(buf []byte, v string) []byte {
+	buf = appendLength(buf, len(v))
 	buf = append(buf, v...)
 	return buf
 }

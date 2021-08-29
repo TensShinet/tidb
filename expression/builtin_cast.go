@@ -680,12 +680,12 @@ func (b *builtinCastDecimalAsJSONSig) evalJSON(row chunk.Row) (json.BinaryJSON, 
 	if isNull || err != nil {
 		return json.BinaryJSON{}, true, err
 	}
-	// FIXME: `select json_type(cast(1111.11 as json))` should return `DECIMAL`, we return `DOUBLE` now.
-	f64, err := val.ToFloat64()
+	precision, frac := val.PrecisionAndFrac()
+	decimalBin, err := val.ToBin(precision, frac)
 	if err != nil {
 		return json.BinaryJSON{}, true, err
 	}
-	return json.CreateBinary(f64), isNull, err
+	return json.CreateBinary(json.CustomData{TypeCode: json.CustomTypeCodeDecimal, Value: decimalBin}), isNull, err
 }
 
 type builtinCastStringAsJSONSig struct {

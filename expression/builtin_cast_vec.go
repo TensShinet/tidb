@@ -1900,19 +1900,18 @@ func (b *builtinCastDecimalAsJSONSig) vecEvalJSON(input *chunk.Chunk, result *ch
 	}
 
 	result.ReserveJSON(n)
-	f64s := buf.Decimals()
-	var f float64
+	decimals := buf.Decimals()
 	for i := 0; i < n; i++ {
 		if buf.IsNull(i) {
 			result.AppendNull()
 			continue
 		}
-		// FIXME: `select json_type(cast(1111.11 as json))` should return `DECIMAL`, we return `DOUBLE` now.
-		f, err = f64s[i].ToFloat64()
+		precision, frac := decimals[i].PrecisionAndFrac()
+		decimalBin, err := decimals[i].ToBin(precision, frac)
 		if err != nil {
 			return err
 		}
-		result.AppendJSON(json.CreateBinary(f))
+		result.AppendJSON(json.CreateBinary(json.CustomData{TypeCode: json.CustomTypeCodeDecimal, Value: decimalBin}))
 	}
 	return nil
 }
